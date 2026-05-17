@@ -64,6 +64,8 @@ For Android walk mode, connect the phone to the same Wi-Fi and open `http://YOUR
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
+For Render, use manual **Web Service** + **Static Site** setup. Do not use Render Blueprint if your account asks for payment details there.
+
 ## API
 
 See [docs/API.md](docs/API.md).

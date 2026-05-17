@@ -21,29 +21,20 @@ npm run dev
 
 Open `http://localhost:5173`. On Android, open `http://YOUR_PC_LAN_IP:5173` while the phone is on the same Wi-Fi.
 
-## Render Blueprint: Backend + Frontend
+## Render Without Blueprint
 
-Recommended path:
+Do not use **New > Blueprint**. Render can ask for payment details there.
 
-1. Push this repo to GitHub.
-2. In Render, click **New > Blueprint**.
-3. Connect `adernall/aethersense`.
-4. Choose branch `main`.
-5. Keep Blueprint file path as `render.yaml`.
-6. Apply the Blueprint.
+Use two normal manual services instead:
 
-The Blueprint creates:
-
-- `aethersense-api`: Python/FastAPI web service.
-- `aethersense`: static React frontend.
-
-The frontend receives `VITE_API_BASE` and `VITE_WS_BASE` from the API service's `RENDER_EXTERNAL_URL`, so you do not need to hand-type the API URL when using the Blueprint.
-
-## Manual Render Settings
-
-If you do not use the Blueprint, create these two services manually.
+1. Create the backend as a **Web Service**.
+2. Copy the backend URL.
+3. Create the frontend as a **Static Site**.
+4. Paste the backend URL into the frontend environment variables.
 
 ### Backend Web Service
+
+Render Dashboard -> **New > Web Service**
 
 - Name: `aethersense-api`
 - Runtime: `Python 3`
@@ -55,7 +46,21 @@ If you do not use the Blueprint, create these two services manually.
 - Environment Variables:
   - `PYTHON_VERSION=3.12.0`
 
+After deploy, open:
+
+```text
+https://YOUR-AETHERSENSE-API.onrender.com/api/health
+```
+
+You should see:
+
+```json
+{"status":"ok","stack":"fastapi-free-open-source"}
+```
+
 ### Frontend Static Site
+
+Render Dashboard -> **New > Static Site**
 
 - Name: `aethersense`
 - Runtime: `Static Site`
@@ -72,7 +77,7 @@ If you do not use the Blueprint, create these two services manually.
 
 The frontend accepts `https://` for `VITE_WS_BASE` and converts it to `wss://` in the browser.
 
-## Render Free Backend Only
+## Render Backend Only
 
 If you want to host the frontend somewhere else, create only the backend service:
 
