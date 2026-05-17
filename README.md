@@ -1,48 +1,64 @@
 # AetherSense
 
-AetherSense is a 100% free, zero-hardware, open-source Wi-Fi environmental visualization and analysis platform. It uses an existing home Wi-Fi connection, an Android phone browser, and optionally a low-end PC or native Android collector.
+**A zero-cost Wi-Fi environmental intelligence lab for your home.**
 
-It is intentionally honest: this is not CSI, not Wi-Fi X-ray imaging, not medical sensing, and not exact room reconstruction.
+AetherSense turns a normal home Wi-Fi connection, an Android phone browser, and an optional low-end PC into a futuristic signal-mapping web app. It visualizes real network timing behavior, helps map weak/interference zones, supports editable multi-floor house plans, and estimates disturbance patterns without pretending to do impossible Wi-Fi magic.
 
-## What It Does
+![AetherSense dashboard](docs/aethersense-browser-1440.png)
 
-- Live browser-safe Wi-Fi/network monitoring
-- Latency, jitter, interruption, downlink hint, and timing fluctuation capture
-- Manual walk-around room sampling from an Android phone
-- Custom house mapping with up to 4 floors
-- Editable rooms, walls, doors, windows, room names, and optional room dimensions
-- Router floor, position, and height placement
-- Floor-by-floor heatmap switching
-- 2D room heatmap for weak, strong, dead, and unstable zones
-- Pseudo-3D signal cloud visualization
-- Approximate movement and occupancy disturbance inference
-- Interruption and reflection-heavy zone heuristics
+## The Honest Promise
+
+AetherSense is built to look sci-fi, but stay technically honest.
+
+It does **not** claim:
+
+- CSI sensing
+- Wi-Fi X-ray vision
+- hidden-human imaging
+- medical vitals
+- accurate heartbeat or BPM
+- exact obstacle detection
+- guaranteed door/window detection
+- exact room reconstruction
+- fake hardcoded live sensing
+
+It does use real, free, browser-accessible signals:
+
+- backend ping latency
+- jitter and timing fluctuation
+- connectivity interruptions
+- browser Network Information API when available
+- optional local RSSI collectors when the device/OS actually exposes RSSI
+
+## What It Can Do
+
+- Live Wi-Fi/network timing dashboard
+- Android-friendly walk-and-sample collection mode
+- Editable house map with up to 4 floors
+- Custom rooms, names, walls, doors, windows, dimensions, router position, and router height
+- Floor-by-floor heatmaps
+- Weak, strong, dead, unstable, and fluctuation zones
+- Approximate movement/disturbance inference
+- Approximate door/window changed/open/closed hints from nearby signal changes
+- Manual door/window overrides
+- Pseudo-3D signal cloud with WebGL fallback for weak machines
 - Experimental breathing gate that disables itself when fidelity is insufficient
-- Approximate door/window state changes from nearby signal behavior, with manual override
-- Optional RSSI ingestion from local open-source collectors
-
-## What It Does Not Claim
-
-- No true CSI-based sensing
-- No accurate heartbeat or BPM
-- No medical-grade vitals
-- No hidden human imaging
-- No true Wi-Fi tomography
-- No perfect obstacle detection
-- No guaranteed door/window state detection
-- No fake hardcoded live sensing data
+- Free deployment path with Render manual services
 
 ## Stack
 
-- Frontend: React, Vite, TypeScript, Three.js, lucide icons, CSS
+- Frontend: React, Vite, TypeScript, Three.js, CSS
 - Backend: FastAPI, WebSockets, NumPy, SciPy, scikit-learn
-- Storage: local JSONL session files by default
-- Deployment: free frontend host plus free backend host
+- Storage: local JSONL session files
+- Optional collectors: Python PC collector, Android Kotlin skeleton
+- Cost: free
+- Hardware required: none beyond your existing router/phone/PC
 
-## Quick Start
+## Local Setup
+
+Backend:
 
 ```bash
-npm install
 cd backend
 python -m venv .venv
 .venv\Scripts\activate
@@ -50,34 +66,96 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-In a second terminal:
+Frontend:
 
 ```bash
+npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+Open:
 
-For Android walk mode, connect the phone to the same Wi-Fi and open `http://YOUR_PC_LAN_IP:5173`.
+```text
+http://localhost:5173
+```
 
-## Deployment
+For Android walk mode, keep the phone on the same Wi-Fi and open:
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+```text
+http://YOUR_PC_LAN_IP:5173
+```
 
-For Render, use manual **Web Service** + **Static Site** setup. Do not use Render Blueprint if your account asks for payment details there.
+## Render Deployment Without Blueprint
 
-## API
+Do **not** use Render Blueprint if it asks for payment details. Use normal manual services instead.
 
-See [docs/API.md](docs/API.md).
+### 1. Backend
 
-## Architecture
+Render -> **New > Web Service**
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+- Repo: `adernall/aethersense`
+- Name: `aethersense-api`
+- Runtime: `Python 3`
+- Root Directory: `backend`
+- Build Command: `pip install -r requirements.txt`
+- Start Command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Health Check Path: `/api/health`
+- Instance Type: `Free`
+- Environment Variable: `PYTHON_VERSION=3.12.0`
 
-## Compatibility
+After deploy, test:
 
-See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md).
+```text
+https://YOUR-AETHERSENSE-API.onrender.com/api/health
+```
+
+Expected:
+
+```json
+{"status":"ok","stack":"fastapi-free-open-source"}
+```
+
+### 2. Frontend
+
+Render -> **New > Static Site**
+
+- Repo: `adernall/aethersense`
+- Name: `aethersense`
+- Root Directory: leave blank
+- Build Command: `npm ci && npm run build`
+- Publish Directory: `dist`
+- Instance Type: `Free`
+- Rewrite Rule: `/*` -> `/index.html`
+
+Environment variables:
+
+```text
+VITE_API_BASE=https://YOUR-AETHERSENSE-API.onrender.com
+VITE_WS_BASE=https://YOUR-AETHERSENSE-API.onrender.com
+```
+
+The frontend converts the `https://` WebSocket base to `wss://` automatically.
+
+## Optional RSSI Collectors
+
+Browsers usually hide RSSI and SSID for privacy. That is normal.
+
+Optional local collectors are included only when you want better fidelity:
+
+- `collectors/pc_wifi_collector.py`: uses OS Wi-Fi commands where available
+- `collectors/android-kotlin/`: native Android RSSI skeleton requiring user permission
+
+If RSSI is unavailable, collectors stop clearly instead of inventing values.
+
+## Project Map
+
+```text
+backend/       FastAPI, WebSockets, analysis, session storage
+src/           React app, heatmap, house editor, telemetry client
+collectors/    Optional local RSSI collectors
+docs/          API, deployment, architecture, compatibility, troubleshooting
+```
 
 ## License
 
-MIT. Use, modify, and self-host for free.
+MIT. Build on it, self-host it, remix it, and keep it honest.
