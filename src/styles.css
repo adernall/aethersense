@@ -286,6 +286,9 @@ select {
 
 .toolset button {
   padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
 }
 
 .primary-action {
@@ -329,17 +332,50 @@ select {
   height: 100%;
   min-height: 510px;
   cursor: crosshair;
+  touch-action: none;
 }
 
 .map-frame canvas {
   display: block;
 }
 
+.map-frame.is-panning {
+  cursor: grab;
+}
+
+.map-legend,
+.map-hud,
+.position-chip,
+.map-view-controls {
+  position: absolute;
+}
+
 .map-legend,
 .map-hud,
 .position-chip {
-  position: absolute;
   pointer-events: none;
+}
+
+.map-view-controls {
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(4, 10, 13, 0.75);
+  z-index: 3;
+}
+
+.map-view-controls button {
+  min-width: 34px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: var(--text);
+  background: rgba(12, 25, 32, 0.82);
+  font-weight: 800;
 }
 
 .map-legend {

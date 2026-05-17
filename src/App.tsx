@@ -7,9 +7,11 @@ import {
   BrainCircuit,
   DoorOpen,
   Cpu,
+  Eraser,
   Gauge,
   Home,
   Map,
+  Move,
   Pause,
   Play,
   Radar,
@@ -22,14 +24,13 @@ import {
 } from "lucide-react";
 import { createAnalysisSocket, loadAnalysis, submitSample } from "./api";
 import { DensityBars, Sparkline } from "./components/Charts";
-import { HeatmapCanvas } from "./components/HeatmapCanvas";
+import { HeatmapCanvas, type MapAction, type MapTool } from "./components/HeatmapCanvas";
 import { SignalCloud } from "./components/SignalCloud";
 import { addFloor, floorById, inferPortalStates, loadHouseMap, saveHouseMap } from "./houseMap";
 import { measureTrace, readNetworkInformation } from "./telemetry";
 import type { AnalysisResult, HouseMap, Portal, TelemetrySample, TracePoint } from "./types";
 
 const SESSION_KEY = "aethersense.session";
-type MapTool = "sample" | "room" | "wall" | "door" | "window" | "router";
 
 function sessionId() {
   const existing = localStorage.getItem(SESSION_KEY);
@@ -51,7 +52,6 @@ export function App() {
   const [houseMap, setHouseMap] = useState<HouseMap>(loadHouseMap);
   const [mapTool, setMapTool] = useState<MapTool>("sample");
   const [newRoomName, setNewRoomName] = useState("New Room");
-  const [wallStart, setWallStart] = useState<{ x: number; y: number } | null>(null);
   const traceRef = useRef<TracePoint | null>(null);
 
   const network = readNetworkInformation();
@@ -136,55 +136,72 @@ export function App() {
     });
   }
 
-  function handleMapToolClick(point: { x: number; y: number }) {
-    if (mapTool === "sample") return;
-    if (mapTool === "router") {
-      updateHouseMap({ ...houseMap, router: { ...houseMap.router, floorId: activeFloor.id, x: point.x, y: point.y } });
-      return;
+  function handleMapAction(action: MapAction) {
+    if (action.type === "sample") return;
+    if (action.type === "router") {
+      updateHouseMap({ ...houseMap, router: { ...houseMap.router, floorId: activeFloor.id, x: action.point.x, y: action.point.y } });
     }
-    if (mapTool === "room") {
-      const id = crypto.randomUUID();
+    if (action.type === "room") addRoomFromRectangle(action.start, action.end);
+    if (action.type === "wall") {
       updateActiveFloor((floor) => ({
         ...floor,
-        rooms: [
-          ...floor.rooms,
-          {
-            id,
-            name: newRoomName || `Room ${floor.rooms.length + 1}`,
-            x: Math.max(2, point.x - 12),
-            y: Math.max(2, point.y - 9),
-            w: 24,
-            h: 18,
-            dimensions: { width_m: 3, length_m: 3, height_m: 2.7 }
-          }
-        ]
+        walls: [...floor.walls, { id: crypto.randomUUID(), x1: action.start.x, y1: action.start.y, x2: action.end.x, y2: action.end.y, material: "unknown" }]
       }));
-      return;
     }
-    if (mapTool === "wall") {
-      if (!wallStart) {
-        setWallStart(point);
-        return;
-      }
-      updateActiveFloor((floor) => ({
-        ...floor,
-        walls: [...floor.walls, { id: crypto.randomUUID(), x1: wallStart.x, y1: wallStart.y, x2: point.x, y2: point.y, material: "unknown" }]
-      }));
-      setWallStart(null);
-      return;
-    }
-    if (mapTool === "door" || mapTool === "window") {
-      const portal: Portal = {
-        id: crypto.randomUUID(),
-        kind: mapTool,
-        name: `${mapTool === "door" ? "Door" : "Window"} ${activeFloor.portals.length + 1}`,
-        x: point.x,
-        y: point.y,
-        width_m: mapTool === "door" ? 0.9 : 1.2,
-        state: "unknown"
-      };
-      updateActiveFloor((floor) => ({ ...floor, portals: [...floor.portals, portal] }));
-    }
+    if (action.type === "portal") addSnappedPortal(action);
+    if (action.type === "erase") eraseNearest(action.point);
+  }
+
+  function addRoomFromRectangle(start: { x: number; y: number }, end: { x: number; y: number }) {
+    const x = Math.min(start.x, end.x);
+    const y = Math.min(start.y, end.y);
+    const w = Math.abs(end.x - start.x);
+    const h = Math.abs(end.y - start.y);
+    if (w < 3 || h < 3) return;
+    updateActiveFloor((floor) => ({
+      ...floor,
+      rooms: [
+        ...floor.rooms,
+        {
+          id: crypto.randomUUID(),
+          name: newRoomName || `Room ${floor.rooms.length + 1}`,
+          x,
+          y,
+          w,
+          h,
+          dimensions: { width_m: roundMeters(w / 7), length_m: roundMeters(h / 7), height_m: 2.7 }
+        }
+      ]
+    }));
+  }
+
+  function addSnappedPortal(action: Extract<MapAction, { type: "portal" }>) {
+    const portal: Portal = {
+      id: crypto.randomUUID(),
+      kind: action.kind,
+      name: `${action.kind === "door" ? "Door" : "Window"} ${activeFloor.portals.length + 1}`,
+      x: action.point.x,
+      y: action.point.y,
+      width_m: action.kind === "door" ? 0.9 : 1.2,
+      state: "unknown"
+    };
+    updateActiveFloor((floor) => ({ ...floor, portals: [...floor.portals, portal] }));
+  }
+
+  function eraseNearest(point: { x: number; y: number }) {
+    const candidates = [
+      ...activeFloor.portals.map((portal) => ({ id: portal.id, type: "portal" as const, distance: distance(point, portal) })),
+      ...activeFloor.rooms.map((room) => ({ id: room.id, type: "room" as const, distance: distanceToRect(point, room) })),
+      ...activeFloor.walls.map((wall) => ({ id: wall.id, type: "wall" as const, distance: distanceToSegment(point, { x: wall.x1, y: wall.y1 }, { x: wall.x2, y: wall.y2 }) }))
+    ].sort((a, b) => a.distance - b.distance);
+    const target = candidates[0];
+    if (!target || target.distance > 8) return;
+    updateActiveFloor((floor) => ({
+      ...floor,
+      rooms: target.type === "room" ? floor.rooms.filter((room) => room.id !== target.id) : floor.rooms,
+      walls: target.type === "wall" ? floor.walls.filter((wall) => wall.id !== target.id) : floor.walls,
+      portals: target.type === "portal" ? floor.portals.filter((portal) => portal.id !== target.id) : floor.portals
+    }));
   }
 
   function setActiveFloor(floorId: string) {
@@ -338,10 +355,14 @@ export function App() {
                   ["wall", "Wall"],
                   ["door", "Door"],
                   ["window", "Window"],
-                  ["router", "Router"]
+                  ["router", "Router"],
+                  ["eraser", "Erase"],
+                  ["pan", "Pan"]
                 ] as const
               ).map(([tool, label]) => (
                 <button className={mapTool === tool ? "selected" : ""} onClick={() => setMapTool(tool)} key={tool}>
+                  {tool === "eraser" && <Eraser size={15} />}
+                  {tool === "pan" && <Move size={15} />}
                   {label}
                 </button>
               ))}
@@ -371,8 +392,9 @@ export function App() {
               floor={activeFloor}
               router={houseMap.router}
               portalStates={inferredPortals}
+              tool={mapTool}
               onPositionChange={setPosition}
-              onMapClick={handleMapToolClick}
+              onMapAction={handleMapAction}
             />
           </div>
           <aside className="inspector">
@@ -402,7 +424,10 @@ export function App() {
                     />
                   </label>
                 </div>
-                <small>Max 4 floors. Pick a map tool, then tap the plan. Walls are drawn but never block samples.</small>
+                <small>
+                  Drag Room to draw a rectangle. Drag Wall to create a segment. Door/window clicks snap to nearby walls.
+                  Erase removes the nearest room, wall, door, or window.
+                </small>
                 <div className="room-editor">
                   {activeFloor.rooms.slice(0, 6).map((room) => (
                     <div className="room-editor-row" key={room.id}>
@@ -512,6 +537,29 @@ export function App() {
       </section>
     </main>
   );
+}
+
+function roundMeters(value: number) {
+  return Math.max(0.5, Math.round(value * 10) / 10);
+}
+
+function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function distanceToRect(point: { x: number; y: number }, rect: { x: number; y: number; w: number; h: number }) {
+  const dx = Math.max(rect.x - point.x, 0, point.x - (rect.x + rect.w));
+  const dy = Math.max(rect.y - point.y, 0, point.y - (rect.y + rect.h));
+  return Math.hypot(dx, dy);
+}
+
+function distanceToSegment(point: { x: number; y: number }, start: { x: number; y: number }, end: { x: number; y: number }) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSq = dx * dx + dy * dy;
+  if (!lengthSq) return distance(point, start);
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSq));
+  return distance(point, { x: start.x + t * dx, y: start.y + t * dy });
 }
 
 function Panel({
