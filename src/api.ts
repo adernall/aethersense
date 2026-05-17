@@ -1,6 +1,6 @@
 import type { AnalysisResult, TelemetrySample } from "./types";
 
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+const API_BASE = normalizeHttpBase(import.meta.env.VITE_API_BASE);
 
 export async function pingBackend(): Promise<{ latency: number; serverTs: number }> {
   const start = performance.now();
@@ -36,12 +36,26 @@ export function createAnalysisSocket(
   onMessage: (_analysis: AnalysisResult) => void,
   onState: (_state: "open" | "closed" | "error") => void
 ) {
-  const proto = window.location.protocol === "https:" ? "wss" : "ws";
-  const base = import.meta.env.VITE_WS_BASE ?? `${proto}://${window.location.host}`;
+  const base = normalizeWebSocketBase(import.meta.env.VITE_WS_BASE);
   const socket = new WebSocket(`${base}/ws/${sessionId}`);
   socket.onopen = () => onState("open");
   socket.onclose = () => onState("closed");
   socket.onerror = () => onState("error");
   socket.onmessage = (event) => onMessage(JSON.parse(event.data));
   return socket;
+}
+
+function normalizeHttpBase(value: string | undefined) {
+  return (value ?? "").replace(/\/$/, "");
+}
+
+function normalizeWebSocketBase(value: string | undefined) {
+  if (!value) {
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${proto}://${window.location.host}`;
+  }
+  const url = new URL(value, window.location.origin);
+  if (url.protocol === "https:") url.protocol = "wss:";
+  if (url.protocol === "http:") url.protocol = "ws:";
+  return url.origin.replace(/^http/, "ws");
 }
