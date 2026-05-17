@@ -9,6 +9,11 @@ export function SignalCloud({ analysis }: { analysis: AnalysisResult | null }) {
   useEffect(() => {
     if (!mount.current) return;
     const container = mount.current;
+    const probe = document.createElement("canvas");
+    if (!probe.getContext("webgl") && !probe.getContext("experimental-webgl")) {
+      setWebglAvailable(false);
+      return;
+    }
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(46, container.clientWidth / container.clientHeight, 0.1, 1000);
     camera.position.set(0, 28, 86);

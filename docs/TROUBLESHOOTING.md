@@ -28,6 +28,10 @@ That is expected in normal browsers. Use browser-safe timing mode or the optiona
 
 Walk the room and tap your approximate position before each sample burst. Interpolation confidence increases with coverage.
 
+## Door/window state looks wrong
+
+This is expected when the signal is noisy or there are not enough nearby samples. Door/window state is an approximate inference, not a true sensor. Click a door or window in the sidebar to manually override it.
+
 ## Breathing mode stays disabled
 
 That is expected. It requires stable high-rate RSSI samples and still has very low reliability. It is not medical and not a vital-sign detector.

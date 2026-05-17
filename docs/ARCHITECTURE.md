@@ -5,10 +5,11 @@ flowchart LR
   Phone["Android browser<br/>latency, jitter, connectivity"] --> API["FastAPI backend"]
   OptionalAndroid["Optional native Android collector<br/>RSSI if permission granted"] --> API
   OptionalPC["Optional weak PC collector<br/>OS Wi-Fi RSSI when available"] --> API
+  UI["React/Vite frontend<br/>heatmap, signal cloud, diagnostics"] --> House["Local house map model<br/>4 floors, rooms, walls, portals, router"]
   API --> Store["Local JSONL session store<br/>free and replaceable"]
   API --> Analysis["NumPy/SciPy/scikit-learn<br/>interpolation, clustering, heuristics"]
   Analysis --> WS["WebSocket updates"]
-  WS --> UI["React/Vite frontend<br/>heatmap, signal cloud, diagnostics"]
+  WS --> UI
 ```
 
 ## Data Flow
@@ -16,10 +17,12 @@ flowchart LR
 1. The browser repeatedly calls `/api/ping`.
 2. The client computes latency, jitter, downlink hints, interruptions, and a quality index.
 3. During walk mode, the user taps/updates their location on the room map.
-4. Each real sample is posted to `/api/samples`.
-5. The backend interpolates a room-level heatmap and identifies weak/unstable regions.
-6. Movement and occupancy are inferred only from statistical disturbance patterns and labeled approximate.
-7. Breathing analysis is disabled unless a stable, high-fidelity RSSI stream exists.
+4. The sample includes the active floor ID.
+5. Each real sample is posted to `/api/samples`.
+6. The backend interpolates a floor-level heatmap and identifies weak/unstable regions.
+7. Doors and windows are estimated only from nearby shifts against a local baseline, or set by manual override.
+8. Movement and occupancy are inferred only from statistical disturbance patterns and labeled approximate.
+9. Breathing analysis is disabled unless a stable, high-fidelity RSSI stream exists.
 
 ## Deployment Shape
 

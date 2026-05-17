@@ -7,6 +7,8 @@
 - Connectivity interruption detection
 - Network Information API where the browser supports it
 - Manual room-position sampling
+- Custom multi-floor house mapping in browser local storage
+- Door/window likely-state inference when enough nearby samples exist
 - Real-time WebSocket updates
 - Heatmap visualization
 - Pseudo-3D signal cloud
@@ -19,6 +21,7 @@
 - Channel utilization
 - CSI
 - Raw packets
+- Guaranteed door/window state
 
 These restrictions are intentional browser privacy protections.
 

@@ -1,22 +1,17 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import type { AnalysisResult, HeatCell, TelemetrySample } from "../types";
+import type { AnalysisResult, FloorPlan, HeatCell, Portal, RouterPlacement, TelemetrySample, WallSegment } from "../types";
 
 interface HeatmapCanvasProps {
   analysis: AnalysisResult | null;
   samples: TelemetrySample[];
   currentPosition: { x: number; y: number };
   collecting: boolean;
+  floor: FloorPlan;
+  router: RouterPlacement;
+  portalStates: Portal[];
   onPositionChange: (_position: { x: number; y: number }) => void;
+  onMapClick?: (_position: { x: number; y: number }) => void;
 }
-
-const rooms = [
-  { x: 7, y: 8, w: 32, h: 35, label: "Bedroom" },
-  { x: 42, y: 8, w: 18, h: 22, label: "Bath" },
-  { x: 65, y: 10, w: 28, h: 32, label: "Kitchen" },
-  { x: 8, y: 48, w: 37, h: 36, label: "Living" },
-  { x: 48, y: 42, w: 13, h: 42, label: "Hall" },
-  { x: 66, y: 50, w: 28, h: 34, label: "Office" }
-];
 
 function valueColor(value: number, alpha = 0.8) {
   const clamped = Math.max(0, Math.min(100, value));
@@ -31,7 +26,11 @@ export function HeatmapCanvas({
   samples,
   currentPosition,
   collecting,
-  onPositionChange
+  floor,
+  router,
+  portalStates,
+  onPositionChange,
+  onMapClick
 }: HeatmapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -62,15 +61,17 @@ export function HeatmapCanvas({
     canvas.style.width = `${size.width}px`;
     canvas.style.height = `${size.height}px`;
     ctx.scale(dpr, dpr);
-    draw(ctx, size.width, size.height, cells, samples, currentPosition, collecting);
-  }, [cells, samples, currentPosition, collecting, size]);
+    draw(ctx, size.width, size.height, cells, samples, currentPosition, collecting, floor, router, portalStates);
+  }, [cells, samples, currentPosition, collecting, floor, router, portalStates, size]);
 
   function pointFromEvent(event: PointerEvent<HTMLDivElement>) {
     const rect = event.currentTarget.getBoundingClientRect();
-    onPositionChange({
+    const position = {
       x: Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100)),
       y: Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100))
-    });
+    };
+    onPositionChange(position);
+    onMapClick?.(position);
   }
 
   return (
@@ -86,7 +87,7 @@ export function HeatmapCanvas({
         <span />
       </div>
       <div className="map-hud">
-        <strong>{collecting ? "Collecting samples" : "Set position on map"}</strong>
+        <strong>{collecting ? "Collecting samples" : `Mapping ${floor.name}`}</strong>
         <span>{samples.length} samples</span>
         <span>{analysis?.fidelity ?? "none"} fidelity</span>
       </div>
@@ -101,7 +102,10 @@ function draw(
   cells: HeatCell[],
   samples: TelemetrySample[],
   current: { x: number; y: number },
-  collecting: boolean
+  collecting: boolean,
+  floor: FloorPlan,
+  router: RouterPlacement,
+  portals: Portal[]
 ) {
   ctx.clearRect(0, 0, width, height);
   const grid = ctx.createLinearGradient(0, 0, width, height);
@@ -138,18 +142,30 @@ function draw(
 
   ctx.strokeStyle = "rgba(218, 242, 245, 0.42)";
   ctx.lineWidth = 2;
-  for (const room of rooms) {
+  drawWalls(ctx, width, height, floor.walls);
+
+  for (const room of floor.rooms) {
     const x = (room.x / 100) * width;
     const y = (room.y / 100) * height;
     const w = (room.w / 100) * width;
     const h = (room.h / 100) * height;
     ctx.strokeRect(x, y, w, h);
     ctx.fillStyle = "rgba(3, 10, 14, 0.72)";
-    ctx.fillRect(x + 10, y + 12, ctx.measureText(room.label).width + 22, 24);
+    ctx.fillRect(x + 10, y + 12, ctx.measureText(room.name).width + 22, 24);
     ctx.fillStyle = "rgba(237, 249, 252, 0.9)";
     ctx.font = "12px Inter, system-ui";
-    ctx.fillText(room.label, x + 20, y + 29);
+    ctx.fillText(room.name, x + 20, y + 29);
+    const dim = room.dimensions;
+    if (dim?.width_m || dim?.length_m || dim?.height_m) {
+      const text = `${dim.width_m ?? "?"}m x ${dim.length_m ?? "?"}m${dim.height_m ? ` x ${dim.height_m}m` : ""}`;
+      ctx.fillStyle = "rgba(142, 164, 173, 0.82)";
+      ctx.font = "11px Inter, system-ui";
+      ctx.fillText(text, x + 20, y + h - 14);
+    }
   }
+
+  drawPortals(ctx, width, height, portals);
+  if (router.floorId === floor.id) drawRouter(ctx, width, height, router);
 
   if (samples.length > 1) {
     ctx.setLineDash([8, 8]);
@@ -187,4 +203,69 @@ function draw(
   ctx.beginPath();
   ctx.arc(px, py, 5, 0, Math.PI * 2);
   ctx.fill();
+}
+
+function drawWalls(ctx: CanvasRenderingContext2D, width: number, height: number, walls: WallSegment[]) {
+  for (const wall of walls) {
+    const x1 = (wall.x1 / 100) * width;
+    const y1 = (wall.y1 / 100) * height;
+    const x2 = (wall.x2 / 100) * width;
+    const y2 = (wall.y2 / 100) * height;
+    ctx.strokeStyle = wall.material === "concrete" ? "rgba(255, 255, 255, 0.7)" : "rgba(218, 242, 245, 0.5)";
+    ctx.lineWidth = wall.material === "concrete" || wall.material === "brick" ? 5 : 3;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(3, 10, 14, 0.7)";
+    ctx.font = "10px Inter, system-ui";
+    ctx.fillText(wall.material, (x1 + x2) / 2 + 4, (y1 + y2) / 2 - 4);
+  }
+}
+
+function drawPortals(ctx: CanvasRenderingContext2D, width: number, height: number, portals: Portal[]) {
+  for (const portal of portals) {
+    const x = (portal.x / 100) * width;
+    const y = (portal.y / 100) * height;
+    const color = portal.state.includes("open") ? "#43f07d" : portal.state === "changed" ? "#ffaa35" : "#8ea4ad";
+    ctx.strokeStyle = color;
+    ctx.fillStyle = color;
+    ctx.lineWidth = 3;
+    if (portal.kind === "door") {
+      ctx.beginPath();
+      ctx.arc(x, y, 16, Math.PI * 1.1, Math.PI * 1.75);
+      ctx.stroke();
+      ctx.fillRect(x - 2, y - 14, 4, 28);
+    } else {
+      ctx.strokeRect(x - 18, y - 5, 36, 10);
+      ctx.beginPath();
+      ctx.moveTo(x - 12, y);
+      ctx.lineTo(x + 12, y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "rgba(3, 10, 14, 0.76)";
+    ctx.fillRect(x + 8, y - 14, ctx.measureText(portal.name).width + 16, 22);
+    ctx.fillStyle = color;
+    ctx.font = "11px Inter, system-ui";
+    ctx.fillText(portal.name, x + 16, y + 1);
+  }
+}
+
+function drawRouter(ctx: CanvasRenderingContext2D, width: number, height: number, router: RouterPlacement) {
+  const x = (router.x / 100) * width;
+  const y = (router.y / 100) * height;
+  ctx.strokeStyle = "rgba(255, 170, 53, 0.9)";
+  ctx.fillStyle = "rgba(255, 170, 53, 0.2)";
+  ctx.lineWidth = 2;
+  for (const radius of [14, 27, 40]) {
+    ctx.beginPath();
+    ctx.arc(x, y, radius, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#ffaa35";
+  ctx.font = "11px Inter, system-ui";
+  ctx.fillText(`${router.height_m}m`, x + 12, y + 4);
 }

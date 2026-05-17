@@ -10,6 +10,7 @@ CollectorSource = Literal["browser", "android", "pc", "manual"]
 
 class TelemetrySample(BaseModel):
     session_id: str = Field(min_length=4, max_length=128)
+    floor_id: str | None = None
     source: CollectorSource
     x: float = Field(ge=0, le=100)
     y: float = Field(ge=0, le=100)

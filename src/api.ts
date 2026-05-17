@@ -22,8 +22,9 @@ export async function submitSample(sample: TelemetrySample): Promise<AnalysisRes
   return response.json();
 }
 
-export async function loadAnalysis(sessionId: string): Promise<AnalysisResult> {
-  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/analysis`, {
+export async function loadAnalysis(sessionId: string, floorId?: string): Promise<AnalysisResult> {
+  const query = floorId ? `?floor_id=${encodeURIComponent(floorId)}` : "";
+  const response = await fetch(`${API_BASE}/api/sessions/${sessionId}/analysis${query}`, {
     cache: "no-store"
   });
   if (!response.ok) throw new Error(await response.text());

@@ -2,6 +2,7 @@ export type CollectorSource = "browser" | "android" | "pc" | "manual";
 
 export interface TelemetrySample {
   session_id: string;
+  floor_id?: string | null;
   source: CollectorSource;
   x: number;
   y: number;
@@ -15,6 +16,66 @@ export interface TelemetrySample {
   downlink_mbps?: number | null;
   effective_type?: string | null;
   notes?: string | null;
+}
+
+export type PortalKind = "door" | "window";
+export type PortalState = "unknown" | "likely_open" | "likely_closed" | "changed" | "manual_open" | "manual_closed";
+
+export interface RoomShape {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  dimensions?: {
+    width_m?: number;
+    length_m?: number;
+    height_m?: number;
+  };
+}
+
+export interface WallSegment {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  material: "unknown" | "drywall" | "brick" | "concrete" | "glass" | "wood";
+}
+
+export interface Portal {
+  id: string;
+  kind: PortalKind;
+  name: string;
+  roomId?: string;
+  x: number;
+  y: number;
+  width_m?: number;
+  state: PortalState;
+  baselineQuality?: number;
+}
+
+export interface RouterPlacement {
+  floorId: string;
+  x: number;
+  y: number;
+  height_m: number;
+}
+
+export interface FloorPlan {
+  id: string;
+  name: string;
+  elevation_m: number;
+  rooms: RoomShape[];
+  walls: WallSegment[];
+  portals: Portal[];
+}
+
+export interface HouseMap {
+  floors: FloorPlan[];
+  activeFloorId: string;
+  router: RouterPlacement;
 }
 
 export interface HeatCell {

@@ -9,11 +9,16 @@ It is intentionally honest: this is not CSI, not Wi-Fi X-ray imaging, not medica
 - Live browser-safe Wi-Fi/network monitoring
 - Latency, jitter, interruption, downlink hint, and timing fluctuation capture
 - Manual walk-around room sampling from an Android phone
+- Custom house mapping with up to 4 floors
+- Editable rooms, walls, doors, windows, room names, and optional room dimensions
+- Router floor, position, and height placement
+- Floor-by-floor heatmap switching
 - 2D room heatmap for weak, strong, dead, and unstable zones
 - Pseudo-3D signal cloud visualization
 - Approximate movement and occupancy disturbance inference
 - Interruption and reflection-heavy zone heuristics
 - Experimental breathing gate that disables itself when fidelity is insufficient
+- Approximate door/window state changes from nearby signal behavior, with manual override
 - Optional RSSI ingestion from local open-source collectors
 
 ## What It Does Not Claim
@@ -24,6 +29,7 @@ It is intentionally honest: this is not CSI, not Wi-Fi X-ray imaging, not medica
 - No hidden human imaging
 - No true Wi-Fi tomography
 - No perfect obstacle detection
+- No guaranteed door/window state detection
 - No fake hardcoded live sensing data
 
 ## Stack

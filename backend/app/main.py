@@ -41,14 +41,14 @@ def ping(client_ts: int | None = None) -> dict[str, float | int | None]:
 @app.post("/api/samples", response_model=AnalysisResult)
 async def ingest_sample(sample: TelemetrySample) -> AnalysisResult:
     samples = store.append(sample)
-    analysis = analyze_session(sample.session_id, samples)
+    analysis = analyze_session(sample.session_id, samples, sample.floor_id)
     await broadcast(sample.session_id, analysis)
     return analysis
 
 
 @app.get("/api/sessions/{session_id}/analysis", response_model=AnalysisResult)
-def session_analysis(session_id: str) -> AnalysisResult:
-    return analyze_session(session_id, store.get(session_id))
+def session_analysis(session_id: str, floor_id: str | None = None) -> AnalysisResult:
+    return analyze_session(session_id, store.get(session_id), floor_id)
 
 
 @app.websocket("/ws/{session_id}")

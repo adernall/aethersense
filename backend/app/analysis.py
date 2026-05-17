@@ -11,8 +11,9 @@ from sklearn.cluster import DBSCAN
 from .models import AnalysisResult, BreathingState, EventItem, HeatCell, MovementState, TelemetrySample
 
 
-def analyze_session(session_id: str, samples: Sequence[TelemetrySample]) -> AnalysisResult:
-    recent = list(samples)[-900:]
+def analyze_session(session_id: str, samples: Sequence[TelemetrySample], floor_id: str | None = None) -> AnalysisResult:
+    scoped = [sample for sample in samples if floor_id is None or sample.floor_id in (None, floor_id)]
+    recent = list(scoped)[-900:]
     if not recent:
         return AnalysisResult(
             session_id=session_id,
@@ -52,7 +53,7 @@ def analyze_session(session_id: str, samples: Sequence[TelemetrySample]) -> Anal
 
     return AnalysisResult(
         session_id=session_id,
-        sample_count=len(samples),
+        sample_count=len(scoped),
         fidelity=fidelity,
         browser_rssi_available=has_rssi,
         heatmap=heatmap,
